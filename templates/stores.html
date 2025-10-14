@@ -1,0 +1,657 @@
+{% extends "base.html" %}
+
+{% block title %}Store Management - Yellowknife Grocery Tracker{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="display-6 fw-bold text-primary">
+                    <i class="fas fa-store me-2"></i>Store Management
+                </h1>
+                <p class="text-muted">Manage grocery stores and scraping settings</p>
+            </div>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addStoreModal">
+                <i class="fas fa-plus me-1"></i>Add Store
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Store Status Overview -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm bg-success text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                <h3 class="fw-bold">4</h3>
+                <p class="mb-0">Active Stores</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-robot fa-2x mb-2"></i>
+                <h3 class="fw-bold">3</h3>
+                <p class="mb-0">Auto-Scraping</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-clock fa-2x mb-2"></i>
+                <h3 class="fw-bold">2.1h</h3>
+                <p class="mb-0">Avg Update Time</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm bg-info text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-percentage fa-2x mb-2"></i>
+                <h3 class="fw-bold">97.2%</h3>
+                <p class="mb-0">Success Rate</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Store List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-list me-2 text-primary"></i>
+                        Registered Stores
+                    </h5>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn btn-outline-primary" onclick="testAllStores()">
+                            <i class="fas fa-vial me-1"></i>Test All
+                        </button>
+                        <button class="btn btn-outline-success" onclick="updateAllStores()">
+                            <i class="fas fa-sync-alt me-1"></i>Update All
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- Independent Grocer -->
+                <div class="store-card p-4 border-bottom">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="store-logo me-3">
+                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="fas fa-shopping-cart fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-1">Independent Grocer</h5>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                        5016 49 St, Yellowknife, NT
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Active
+                                        </span>
+                                        <span class="badge bg-primary">
+                                            <i class="fas fa-robot me-1"></i>Auto-Scraping
+                                        </span>
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-clock me-1"></i>Updated 1.5h ago
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <div class="mb-2">
+                                <small class="text-muted">Items Tracked:</small>
+                                <span class="fw-bold ms-1">412</span>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Success Rate:</small>
+                                <span class="fw-bold text-success ms-1">98.5%</span>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="testStore('independent')">
+                                    <i class="fas fa-vial"></i>
+                                </button>
+                                <button class="btn btn-outline-success" onclick="updateStore('independent')">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editStoreModal" onclick="editStore('independent')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extra Foods -->
+                <div class="store-card p-4 border-bottom">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="store-logo me-3">
+                                    <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="fas fa-store fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-1">Extra Foods</h5>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                        201 Range Lake Rd, Yellowknife, NT
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Active
+                                        </span>
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-hand-paper me-1"></i>Manual Only
+                                        </span>
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-clock me-1"></i>Updated 3.2h ago
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <div class="mb-2">
+                                <small class="text-muted">Items Tracked:</small>
+                                <span class="fw-bold ms-1">298</span>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Success Rate:</small>
+                                <span class="fw-bold text-warning ms-1">Manual</span>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="testStore('extrafoods')">
+                                    <i class="fas fa-vial"></i>
+                                </button>
+                                <button class="btn btn-outline-success" onclick="updateStore('extrafoods')">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editStoreModal" onclick="editStore('extrafoods')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- The Co-op -->
+                <div class="store-card p-4 border-bottom">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="store-logo me-3">
+                                    <div class="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="fas fa-handshake fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-1">The Co-op</h5>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                        4910 50 St, Yellowknife, NT
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Active
+                                        </span>
+                                        <span class="badge bg-primary">
+                                            <i class="fas fa-robot me-1"></i>Auto-Scraping
+                                        </span>
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-clock me-1"></i>Updated 0.8h ago
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <div class="mb-2">
+                                <small class="text-muted">Items Tracked:</small>
+                                <span class="fw-bold ms-1">367</span>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Success Rate:</small>
+                                <span class="fw-bold text-success ms-1">96.8%</span>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="testStore('coop')">
+                                    <i class="fas fa-vial"></i>
+                                </button>
+                                <button class="btn btn-outline-success" onclick="updateStore('coop')">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editStoreModal" onclick="editStore('coop')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save-On-Foods -->
+                <div class="store-card p-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="store-logo me-3">
+                                    <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                        <i class="fas fa-tag fa-lg"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-1">Save-On-Foods</h5>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>
+                                        5015 50 Ave, Yellowknife, NT
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Active
+                                        </span>
+                                        <span class="badge bg-primary">
+                                            <i class="fas fa-robot me-1"></i>Auto-Scraping
+                                        </span>
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-clock me-1"></i>Updated 2.1h ago
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <div class="mb-2">
+                                <small class="text-muted">Items Tracked:</small>
+                                <span class="fw-bold ms-1">445</span>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Success Rate:</small>
+                                <span class="fw-bold text-success ms-1">95.3%</span>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="testStore('saveon')">
+                                    <i class="fas fa-vial"></i>
+                                </button>
+                                <button class="btn btn-outline-success" onclick="updateStore('saveon')">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editStoreModal" onclick="editStore('saveon')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Store Modal -->
+<div class="modal fade" id="addStoreModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Add New Store
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addStoreForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Store Name</label>
+                            <input type="text" class="form-control" placeholder="Enter store name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Store Chain</label>
+                            <select class="form-select">
+                                <option value="">Select chain (optional)</option>
+                                <option value="loblaws">Loblaws</option>
+                                <option value="sobeys">Sobeys</option>
+                                <option value="metro">Metro</option>
+                                <option value="coop">Co-op</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Address</label>
+                            <input type="text" class="form-control" placeholder="Enter full address">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Website URL</label>
+                            <input type="url" class="form-control" placeholder="https://...">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Phone Number</label>
+                            <input type="tel" class="form-control" placeholder="(867) 123-4567">
+                        </div>
+                        <div class="col-12">
+                            <hr>
+                            <h6 class="fw-bold">Scraping Configuration</h6>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enableScraping">
+                                <label class="form-check-label" for="enableScraping">
+                                    Enable Auto-Scraping
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Update Frequency</label>
+                            <select class="form-select">
+                                <option value="6">Every 6 hours</option>
+                                <option value="12">Every 12 hours</option>
+                                <option value="24" selected>Daily</option>
+                                <option value="168">Weekly</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addStore()">
+                    <i class="fas fa-plus me-1"></i>Add Store
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Store Modal -->
+<div class="modal fade" id="editStoreModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Edit Store Settings
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editStoreForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Store Name</label>
+                            <input type="text" class="form-control" id="editStoreName" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" id="editStoreStatus">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="maintenance">Maintenance</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Address</label>
+                            <input type="text" class="form-control" id="editStoreAddress">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Website URL</label>
+                            <input type="url" class="form-control" id="editStoreWebsite">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Phone Number</label>
+                            <input type="tel" class="form-control" id="editStorePhone">
+                        </div>
+                        <div class="col-12">
+                            <hr>
+                            <h6 class="fw-bold">Scraping Configuration</h6>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editEnableScraping">
+                                <label class="form-check-label" for="editEnableScraping">
+                                    Enable Auto-Scraping
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Update Frequency</label>
+                            <select class="form-select" id="editUpdateFrequency">
+                                <option value="6">Every 6 hours</option>
+                                <option value="12">Every 12 hours</option>
+                                <option value="24">Daily</option>
+                                <option value="168">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Scraping Selectors</label>
+                            <textarea class="form-control" rows="3" id="editScrapingSelectors" 
+                                      placeholder="CSS selectors for scraping (JSON format)"></textarea>
+                            <small class="text-muted">Advanced: Custom CSS selectors for price extraction</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-danger me-auto" onclick="deleteStore()">
+                    <i class="fas fa-trash me-1"></i>Delete Store
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveStoreChanges()">
+                    <i class="fas fa-save me-1"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentEditingStore = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Form validation for add store
+    document.getElementById('addStoreForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        addStore();
+    });
+}
+
+function testStore(storeId) {
+    showAlert(`Testing connection to store: ${storeId}...`, 'info');
+    
+    // Simulate test
+    setTimeout(() => {
+        const success = Math.random() > 0.2; // 80% success rate
+        if (success) {
+            showAlert(`Store ${storeId} test successful!`, 'success');
+        } else {
+            showAlert(`Store ${storeId} test failed. Check configuration.`, 'danger');
+        }
+    }, 2000);
+}
+
+function updateStore(storeId) {
+    showAlert(`Updating prices for store: ${storeId}...`, 'info');
+    
+    // Simulate update
+    setTimeout(() => {
+        const itemsUpdated = Math.floor(Math.random() * 100) + 200;
+        showAlert(`Store ${storeId} updated successfully! ${itemsUpdated} items processed.`, 'success');
+    }, 3000);
+}
+
+function testAllStores() {
+    showAlert('Testing all store connections...', 'info');
+    
+    setTimeout(() => {
+        showAlert('All store tests completed! 3/4 stores responding normally.', 'success');
+    }, 5000);
+}
+
+function updateAllStores() {
+    showAlert('Updating all store prices...', 'info');
+    
+    setTimeout(() => {
+        showAlert('All stores updated successfully! 1,247 items processed.', 'success');
+    }, 8000);
+}
+
+function editStore(storeId) {
+    currentEditingStore = storeId;
+    
+    // Populate form with current store data
+    const storeData = getStoreData(storeId);
+    document.getElementById('editStoreName').value = storeData.name;
+    document.getElementById('editStoreStatus').value = storeData.status;
+    document.getElementById('editStoreAddress').value = storeData.address;
+    document.getElementById('editStoreWebsite').value = storeData.website;
+    document.getElementById('editStorePhone').value = storeData.phone;
+    document.getElementById('editEnableScraping').checked = storeData.scraping;
+    document.getElementById('editUpdateFrequency').value = storeData.frequency;
+    document.getElementById('editScrapingSelectors').value = storeData.selectors;
+}
+
+function getStoreData(storeId) {
+    // Mock data - would come from backend
+    const storeData = {
+        'independent': {
+            name: 'Independent Grocer',
+            status: 'active',
+            address: '5016 49 St, Yellowknife, NT',
+            website: 'https://www.yourindependentgrocer.ca',
+            phone: '(867) 873-3003',
+            scraping: true,
+            frequency: '6',
+            selectors: '{"price": ".price", "name": ".product-name", "category": ".category"}'
+        },
+        'extrafoods': {
+            name: 'Extra Foods',
+            status: 'active',
+            address: '201 Range Lake Rd, Yellowknife, NT',
+            website: 'https://www.extrafoods.ca',
+            phone: '(867) 873-4601',
+            scraping: false,
+            frequency: '24',
+            selectors: ''
+        },
+        'coop': {
+            name: 'The Co-op',
+            status: 'active',
+            address: '4910 50 St, Yellowknife, NT',
+            website: 'https://www.co-op.coop',
+            phone: '(867) 920-4571',
+            scraping: true,
+            frequency: '6',
+            selectors: '{"price": ".price-current", "name": ".product-title"}'
+        },
+        'saveon': {
+            name: 'Save-On-Foods',
+            status: 'active',
+            address: '5015 50 Ave, Yellowknife, NT',
+            website: 'https://www.saveonfoods.com',
+            phone: '(867) 766-4600',
+            scraping: true,
+            frequency: '6',
+            selectors: '{"price": ".price-amount", "name": ".product-name"}'
+        }
+    };
+    
+    return storeData[storeId] || {};
+}
+
+function addStore() {
+    const form = document.getElementById('addStoreForm');
+    const formData = new FormData(form);
+    
+    // Validate form
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+    }
+    
+    // Simulate adding store
+    showAlert('Adding new store to system...', 'info');
+    
+    setTimeout(() => {
+        showAlert('Store added successfully! Scraping configuration saved.', 'success');
+        
+        // Close modal and reset form
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addStoreModal'));
+        modal.hide();
+        form.reset();
+        form.classList.remove('was-validated');
+    }, 2000);
+}
+
+function saveStoreChanges() {
+    if (!currentEditingStore) return;
+    
+    showAlert(`Saving changes to ${currentEditingStore}...`, 'info');
+    
+    setTimeout(() => {
+        showAlert('Store settings updated successfully!', 'success');
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editStoreModal'));
+        modal.hide();
+        
+        currentEditingStore = null;
+    }, 1500);
+}
+
+function deleteStore() {
+    if (!currentEditingStore) return;
+    
+    if (confirm(`Are you sure you want to delete the store: ${currentEditingStore}? This action cannot be undone.`)) {
+        showAlert(`Deleting store: ${currentEditingStore}...`, 'warning');
+        
+        setTimeout(() => {
+            showAlert('Store deleted successfully!', 'success');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editStoreModal'));
+            modal.hide();
+            
+            currentEditingStore = null;
+        }, 2000);
+    }
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('main.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 4000);
+}
+</script>
+{% endblock %}

@@ -129,8 +129,103 @@ def scheduled_scrape():
 
 @app.route('/')
 def index():
-    """Main dashboard"""
-    return render_template('index.html')
+    """Main dashboard with real data"""
+    db = get_db()
+    
+    # Get summary statistics
+    stats = {
+        'total_items': db.execute('SELECT COUNT(*) as count FROM items').fetchone()['count'],
+        'active_stores': db.execute('SELECT COUNT(*) as count FROM stores WHERE scraping_enabled = 1').fetchone()['count'],
+        'total_prices': db.execute('SELECT COUNT(*) as count FROM prices WHERE date = DATE("now")').fetchone()['count'],
+        'last_update': db.execute('SELECT MAX(created_at) as last_update FROM prices').fetchone()['last_update']
+    }
+    
+    # Get recent price comparisons
+    recent_prices = db.execute('''
+        SELECT i.name, i.id, c.name as category,
+               GROUP_CONCAT(s.name || ':' || p.price) as store_prices
+        FROM items i
+        LEFT JOIN categories c ON i.category_id = c.id
+        LEFT JOIN prices p ON i.id = p.item_id AND p.date = DATE("now")
+        LEFT JOIN stores s ON p.store_id = s.id
+        GROUP BY i.id, i.name, c.name
+        LIMIT 10
+    ''').fetchall()
+    
+    return render_template('index.html', stats=stats, recent_prices=recent_prices)
+
+@app.route('/price-trends')
+def price_trends():
+    """Price trends page with trend data"""
+    db = get_db()
+    
+    # Get trending items
+    trending_items = db.execute('''
+        SELECT i.name, i.id, 
+               AVG(p.price) as avg_price,
+               COUNT(p.id) as price_count,
+               c.name as category
+        FROM items i
+        JOIN prices p ON i.id = p.item_id
+        LEFT JOIN categories c ON i.category_id = c.id
+        WHERE p.date >= DATE('now', '-30 days')
+        GROUP BY i.id, i.name, c.name
+        HAVING price_count > 5
+        ORDER BY price_count DESC
+        LIMIT 20
+    ''').fetchall()
+    
+    return render_template('price_trends.html', trending_items=trending_items)
+
+@app.route('/stores')
+def stores():
+    """Store management page with store data"""
+    db = get_db()
+    
+    # Get all stores with statistics
+    stores_data = db.execute('''
+        SELECT s.*, 
+               COUNT(p.id) as total_prices,
+               COUNT(CASE WHEN p.date = DATE('now') THEN 1 END) as today_prices,
+               MAX(p.created_at) as last_update
+        FROM stores s
+        LEFT JOIN prices p ON s.id = p.store_id
+        GROUP BY s.id, s.name
+        ORDER BY s.name
+    ''').fetchall()
+    
+    return render_template('stores.html', stores=stores_data)
+
+@app.route('/items')
+def items():
+    """Items management page with item data"""
+    db = get_db()
+    
+    # Get items with category and recent prices
+    items_data = db.execute('''
+        SELECT i.*, c.name as category_name,
+               COUNT(p.id) as price_count,
+               MIN(p.price) as min_price,
+               MAX(p.price) as max_price,
+               AVG(p.price) as avg_price,
+               MAX(p.created_at) as last_price_update
+        FROM items i
+        LEFT JOIN categories c ON i.category_id = c.id
+        LEFT JOIN prices p ON i.id = p.item_id
+        GROUP BY i.id, i.name, c.name
+        ORDER BY i.name
+    ''').fetchall()
+    
+    # Get category statistics
+    category_stats = db.execute('''
+        SELECT c.name, COUNT(i.id) as item_count
+        FROM categories c
+        LEFT JOIN items i ON c.id = i.category_id
+        GROUP BY c.id, c.name
+        ORDER BY item_count DESC
+    ''').fetchall()
+    
+    return render_template('items.html', items=items_data, categories=category_stats)
 
 @app.route('/api/stores', methods=['GET', 'POST'])
 def stores():

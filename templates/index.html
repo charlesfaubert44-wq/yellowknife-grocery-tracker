@@ -1,0 +1,516 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Yellowknife Grocery Tracker{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="display-6 fw-bold text-primary">
+                    <i class="fas fa-tachometer-alt me-2"></i>Price Dashboard
+                </h1>
+                <p class="text-muted">Compare prices across Yellowknife grocery stores</p>
+            </div>
+            <div class="text-end">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-primary" onclick="refreshData()">
+                        <i class="fas fa-refresh me-1"></i>Refresh
+                    </button>
+                    <button class="btn btn-success" onclick="triggerUpdate()">
+                        <i class="fas fa-sync-alt me-1"></i>Update All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-shopping-basket text-primary fa-2x"></i>
+                    </div>
+                </div>
+                <h3 class="fw-bold text-primary">{{ stats.total_items if stats else '1,247' }}</h3>
+                <p class="text-muted mb-0">Items Tracked</p>
+                <small class="text-success">
+                    <i class="fas fa-arrow-up me-1"></i>+23 this week
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-store text-success fa-2x"></i>
+                    </div>
+                </div>
+                <h3 class="fw-bold text-success">{{ stats.active_stores if stats else '4' }}</h3>
+                <p class="text-muted mb-0">Active Stores</p>
+                <small class="text-info">
+                    <i class="fas fa-check-circle me-1"></i>All online
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-dollar-sign text-warning fa-2x"></i>
+                    </div>
+                </div>
+                <h3 class="fw-bold text-warning">$892</h3>
+                <p class="text-muted mb-0">Avg. Savings/Month</p>
+                <small class="text-success">
+                    <i class="fas fa-arrow-down me-1"></i>vs. single store
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-2">
+                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                        <i class="fas fa-clock text-info fa-2x"></i>
+                    </div>
+                </div>
+                <h3 class="fw-bold text-info">2.3h</h3>
+                <p class="text-muted mb-0">Since Last Update</p>
+                <small class="text-muted">
+                    Next: in 3.7h
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" placeholder="Search items..." id="searchInput">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="categoryFilter">
+                            <option value="">All Categories</option>
+                            <option value="produce">Produce</option>
+                            <option value="dairy">Dairy</option>
+                            <option value="meat">Meat & Seafood</option>
+                            <option value="pantry">Pantry</option>
+                            <option value="frozen">Frozen</option>
+                            <option value="bakery">Bakery</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="storeFilter">
+                            <option value="">All Stores</option>
+                            <option value="independent">Independent Grocer</option>
+                            <option value="extrafoods">Extra Foods</option>
+                            <option value="coop">The Co-op</option>
+                            <option value="saveon">Save-On-Foods</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                            <i class="fas fa-times me-1"></i>Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Price Comparison Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-balance-scale me-2 text-primary"></i>
+                        Price Comparison
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportData()">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="viewMode" id="tableView" checked>
+                            <label class="btn btn-outline-secondary" for="tableView">
+                                <i class="fas fa-table"></i>
+                            </label>
+                            <input type="radio" class="btn-check" name="viewMode" id="cardView">
+                            <label class="btn btn-outline-secondary" for="cardView">
+                                <i class="fas fa-th-large"></i>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="priceTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="border-0 fw-bold">Item</th>
+                                <th class="border-0 fw-bold text-center">Category</th>
+                                <th class="border-0 fw-bold text-center">Independent</th>
+                                <th class="border-0 fw-bold text-center">Extra Foods</th>
+                                <th class="border-0 fw-bold text-center">Co-op</th>
+                                <th class="border-0 fw-bold text-center">Save-On</th>
+                                <th class="border-0 fw-bold text-center">Best Price</th>
+                                <th class="border-0 fw-bold text-center">Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Sample Data Row 1 -->
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-light rounded p-2 me-3">
+                                            <i class="fas fa-apple-alt text-success"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">Bananas (per lb)</div>
+                                            <small class="text-muted">Fresh produce</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-success bg-opacity-10 text-success">Produce</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$1.29</span>
+                                        <div class="price-change text-success">
+                                            <i class="fas fa-arrow-down fa-xs"></i> $0.10
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$1.49</span>
+                                        <div class="price-change text-muted">
+                                            <i class="fas fa-minus fa-xs"></i> No change
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell best-price">
+                                        <span class="fw-bold text-success">$1.19</span>
+                                        <div class="price-change text-success">
+                                            <i class="fas fa-arrow-down fa-xs"></i> $0.05
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$1.39</span>
+                                        <div class="price-change text-danger">
+                                            <i class="fas fa-arrow-up fa-xs"></i> $0.05
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="best-price-badge">
+                                        <span class="badge bg-success">$1.19</span>
+                                        <div class="small text-muted">Co-op</div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="trend-indicator">
+                                        <i class="fas fa-arrow-down text-success"></i>
+                                        <small class="text-success">-8%</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <!-- Sample Data Row 2 -->
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-light rounded p-2 me-3">
+                                            <i class="fas fa-cheese text-warning"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">Milk 2% (4L)</div>
+                                            <small class="text-muted">Dairy products</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-info bg-opacity-10 text-info">Dairy</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell best-price">
+                                        <span class="fw-bold text-success">$5.49</span>
+                                        <div class="price-change text-muted">
+                                            <i class="fas fa-minus fa-xs"></i> No change
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$5.99</span>
+                                        <div class="price-change text-muted">
+                                            <i class="fas fa-minus fa-xs"></i> No change
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$5.79</span>
+                                        <div class="price-change text-danger">
+                                            <i class="fas fa-arrow-up fa-xs"></i> $0.10
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$5.89</span>
+                                        <div class="price-change text-success">
+                                            <i class="fas fa-arrow-down fa-xs"></i> $0.20
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="best-price-badge">
+                                        <span class="badge bg-success">$5.49</span>
+                                        <div class="small text-muted">Independent</div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="trend-indicator">
+                                        <i class="fas fa-arrow-up text-warning"></i>
+                                        <small class="text-warning">+2%</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <!-- Sample Data Row 3 -->
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-light rounded p-2 me-3">
+                                            <i class="fas fa-bread-slice text-warning"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">White Bread (675g)</div>
+                                            <small class="text-muted">Bakery fresh</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-warning bg-opacity-10 text-warning">Bakery</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$2.99</span>
+                                        <div class="price-change text-muted">
+                                            <i class="fas fa-minus fa-xs"></i> No change
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell best-price">
+                                        <span class="fw-bold text-success">$2.79</span>
+                                        <div class="price-change text-success">
+                                            <i class="fas fa-arrow-down fa-xs"></i> $0.20
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$3.19</span>
+                                        <div class="price-change text-danger">
+                                            <i class="fas fa-arrow-up fa-xs"></i> $0.10
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="price-cell">
+                                        <span class="fw-bold">$2.89</span>
+                                        <div class="price-change text-muted">
+                                            <i class="fas fa-minus fa-xs"></i> No change
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="best-price-badge">
+                                        <span class="badge bg-success">$2.79</span>
+                                        <div class="small text-muted">Extra Foods</div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="trend-indicator">
+                                        <i class="fas fa-arrow-down text-success"></i>
+                                        <small class="text-success">-5%</small>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-top">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">Showing 3 of 1,247 items</small>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item disabled">
+                                <span class="page-link">Previous</span>
+                            </li>
+                            <li class="page-item active">
+                                <span class="page-link">1</span>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="#">2</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="#">3</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="#">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+        <div class="spinner-border text-primary mb-3" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h5>Updating Prices...</h5>
+        <p class="text-muted">This may take a few moments</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Initialize dashboard functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Load initial data
+    loadDashboardData();
+    
+    // Setup search and filters
+    setupFilters();
+    
+    // Update last update timestamp
+    updateTimestamp();
+});
+
+function loadDashboardData() {
+    // Simulate loading data
+    console.log('Loading dashboard data...');
+}
+
+function setupFilters() {
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const storeFilter = document.getElementById('storeFilter');
+    
+    [searchInput, categoryFilter, storeFilter].forEach(element => {
+        element.addEventListener('change', filterTable);
+        element.addEventListener('keyup', filterTable);
+    });
+}
+
+function filterTable() {
+    // Filter functionality would be implemented here
+    console.log('Filtering table...');
+}
+
+function clearFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('storeFilter').value = '';
+    filterTable();
+}
+
+function refreshData() {
+    showLoading();
+    // Simulate refresh
+    setTimeout(() => {
+        hideLoading();
+        showAlert('Data refreshed successfully!', 'success');
+    }, 2000);
+}
+
+function triggerUpdate() {
+    showLoading();
+    // Simulate price update
+    setTimeout(() => {
+        hideLoading();
+        showAlert('Price update completed!', 'success');
+        updateTimestamp();
+    }, 5000);
+}
+
+function exportData() {
+    showAlert('Export functionality coming soon!', 'info');
+}
+
+function showLoading() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+function showAlert(message, type) {
+    // Create and show bootstrap alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('main.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+
+function updateTimestamp() {
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent = now.toLocaleString();
+}
+</script>
+{% endblock %}

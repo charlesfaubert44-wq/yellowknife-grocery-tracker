@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yellowknife Grocery Tracker - UI Demo</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8f9fa;
+        }
+        
+        .card {
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+        
+        .price-cell {
+            padding: 0.5rem;
+        }
+        
+        .best-price {
+            background-color: rgba(25, 135, 84, 0.1);
+            border-radius: 6px;
+            position: relative;
+        }
+        
+        .best-price::before {
+            content: '👑';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            font-size: 0.875rem;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+        
+        .loading-content {
+            text-align: center;
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#dashboard">
+                <i class="fas fa-shopping-cart me-2"></i>
+                YK Grocery Tracker
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#dashboard" onclick="showPage('dashboard')">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#trends" onclick="showPage('trends')">
+                            <i class="fas fa-chart-line me-1"></i>Price Trends
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#stores" onclick="showPage('stores')">
+                            <i class="fas fa-store me-1"></i>Stores
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#items" onclick="showPage('items')">
+                            <i class="fas fa-list me-1"></i>Items
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="navbar-nav">
+                    <div class="nav-item">
+                        <button class="btn btn-outline-light btn-sm" onclick="triggerUpdate()">
+                            <i class="fas fa-sync-alt me-1"></i>Update Prices
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container my-4">
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page-content">
+            <!-- Header Section -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="display-6 fw-bold text-primary">
+                                <i class="fas fa-tachometer-alt me-2"></i>Price Dashboard
+                            </h1>
+                            <p class="text-muted">Compare prices across Yellowknife grocery stores</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="d-flex justify-content-center align-items-center mb-2">
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-shopping-basket text-primary fa-2x"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold text-primary">1,247</h3>
+                            <p class="text-muted mb-0">Items Tracked</p>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up me-1"></i>+23 this week
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="d-flex justify-content-center align-items-center mb-2">
+                                <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-store text-success fa-2x"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold text-success">4</h3>
+                            <p class="text-muted mb-0">Active Stores</p>
+                            <small class="text-info">
+                                <i class="fas fa-check-circle me-1"></i>All online
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="d-flex justify-content-center align-items-center mb-2">
+                                <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-dollar-sign text-warning fa-2x"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold text-warning">$892</h3>
+                            <p class="text-muted mb-0">Avg. Savings/Month</p>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-down me-1"></i>vs. single store
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="d-flex justify-content-center align-items-center mb-2">
+                                <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-clock text-info fa-2x"></i>
+                                </div>
+                            </div>
+                            <h3 class="fw-bold text-info">2.3h</h3>
+                            <p class="text-muted mb-0">Since Last Update</p>
+                            <small class="text-muted">Next: in 3.7h</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price Comparison Demo -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0 fw-bold">
+                                <i class="fas fa-balance-scale me-2 text-primary"></i>
+                                Price Comparison Sample
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="border-0 fw-bold">Item</th>
+                                            <th class="border-0 fw-bold text-center">Independent</th>
+                                            <th class="border-0 fw-bold text-center">Extra Foods</th>
+                                            <th class="border-0 fw-bold text-center">Co-op</th>
+                                            <th class="border-0 fw-bold text-center">Save-On</th>
+                                            <th class="border-0 fw-bold text-center">Best Price</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-light rounded p-2 me-3">
+                                                        <i class="fas fa-apple-alt text-success"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold">Bananas (per lb)</div>
+                                                        <small class="text-muted">Fresh produce</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell">
+                                                    <span class="fw-bold">$1.29</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell">
+                                                    <span class="fw-bold">$1.49</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell best-price">
+                                                    <span class="fw-bold text-success">$1.19</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell">
+                                                    <span class="fw-bold">$1.39</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-success">$1.19</span>
+                                                <div class="small text-muted">Co-op</div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-light rounded p-2 me-3">
+                                                        <i class="fas fa-cheese text-warning"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold">Milk 2% (4L)</div>
+                                                        <small class="text-muted">Dairy products</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell best-price">
+                                                    <span class="fw-bold text-success">$5.49</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell">
+                                                    <span class="fw-bold">$5.99</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell">
+                                                    <span class="fw-bold">$5.79</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="price-cell">
+                                                    <span class="fw-bold">$5.89</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-success">$5.49</span>
+                                                <div class="small text-muted">Independent</div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Price Trends Page -->
+        <div id="trends-page" class="page-content" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h1 class="display-6 fw-bold text-primary">
+                        <i class="fas fa-chart-line me-2"></i>Price Trends
+                    </h1>
+                    <p class="text-muted">Historical price analysis and forecasting</p>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0 fw-bold">Price Trend Chart</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="trendChart" style="height: 300px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stores Page -->
+        <div id="stores-page" class="page-content" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h1 class="display-6 fw-bold text-primary">
+                        <i class="fas fa-store me-2"></i>Store Management
+                    </h1>
+                    <p class="text-muted">Manage grocery stores and scraping settings</p>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0 fw-bold">Registered Stores</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold">Independent Grocer</h6>
+                                            <p class="text-muted small">5016 49 St, Yellowknife, NT</p>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-success">Active</span>
+                                                <span class="badge bg-primary">Auto-Scraping</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold">Extra Foods</h6>
+                                            <p class="text-muted small">201 Range Lake Rd, Yellowknife, NT</p>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-success">Active</span>
+                                                <span class="badge bg-warning">Manual Only</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold">The Co-op</h6>
+                                            <p class="text-muted small">4910 50 St, Yellowknife, NT</p>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-success">Active</span>
+                                                <span class="badge bg-primary">Auto-Scraping</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold">Save-On-Foods</h6>
+                                            <p class="text-muted small">5015 50 Ave, Yellowknife, NT</p>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-success">Active</span>
+                                                <span class="badge bg-primary">Auto-Scraping</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Page -->
+        <div id="items-page" class="page-content" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h1 class="display-6 fw-bold text-primary">
+                        <i class="fas fa-list me-2"></i>Items Management
+                    </h1>
+                    <p class="text-muted">Manage tracked grocery items and categories</p>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0 fw-bold">Category Overview</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="text-center p-3 rounded bg-success bg-opacity-10">
+                                        <i class="fas fa-apple-alt text-success fa-2x mb-2"></i>
+                                        <h6 class="fw-bold text-success">Produce</h6>
+                                        <p class="mb-0 small text-muted">312 items</p>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="text-center p-3 rounded bg-info bg-opacity-10">
+                                        <i class="fas fa-cheese text-info fa-2x mb-2"></i>
+                                        <h6 class="fw-bold text-info">Dairy</h6>
+                                        <p class="mb-0 small text-muted">156 items</p>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="text-center p-3 rounded bg-danger bg-opacity-10">
+                                        <i class="fas fa-drumstick-bite text-danger fa-2x mb-2"></i>
+                                        <h6 class="fw-bold text-danger">Meat</h6>
+                                        <p class="mb-0 small text-muted">189 items</p>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="text-center p-3 rounded bg-warning bg-opacity-10">
+                                        <i class="fas fa-bread-slice text-warning fa-2x mb-2"></i>
+                                        <h6 class="fw-bold text-warning">Bakery</h6>
+                                        <p class="mb-0 small text-muted">87 items</p>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="text-center p-3 rounded bg-primary bg-opacity-10">
+                                        <i class="fas fa-snowflake text-primary fa-2x mb-2"></i>
+                                        <h6 class="fw-bold text-primary">Frozen</h6>
+                                        <p class="mb-0 small text-muted">134 items</p>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="text-center p-3 rounded bg-secondary bg-opacity-10">
+                                        <i class="fas fa-box text-secondary fa-2x mb-2"></i>
+                                        <h6 class="fw-bold text-secondary">Pantry</h6>
+                                        <p class="mb-0 small text-muted">245 items</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5>Updating Prices...</h5>
+            <p class="text-muted">This may take a few moments</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-light mt-5 py-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="fw-bold">Yellowknife Grocery Tracker</h6>
+                    <p class="text-muted small mb-0">
+                        Automated price tracking for Yellowknife grocery stores
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-muted small mb-0">
+                        Last updated: <span id="lastUpdate">Oct 14, 2025, 2:30 PM</span>
+                    </p>
+                    <div class="mt-1">
+                        <span class="badge bg-success" id="statusIndicator">
+                            <i class="fas fa-circle me-1"></i>Online
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let trendChart;
+        
+        // Page navigation
+        function showPage(pageId) {
+            // Hide all pages
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.style.display = 'none';
+            });
+            
+            // Show selected page
+            document.getElementById(pageId + '-page').style.display = 'block';
+            
+            // Update navigation
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Initialize page-specific content
+            if (pageId === 'trends' && !trendChart) {
+                initializeTrendChart();
+            }
+        }
+        
+        function initializeTrendChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Average Price',
+                        data: [12, 19, 3, 5, 2, 3],
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+        
+        function triggerUpdate() {
+            showLoading();
+            setTimeout(() => {
+                hideLoading();
+                showNotification('Price update completed successfully!', 'success');
+            }, 3000);
+        }
+        
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = `
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                min-width: 300px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            `;
+            
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 4000);
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Yellowknife Grocery Tracker Demo initialized');
+        });
+    </script>
+</body>
+</html>

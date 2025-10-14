@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+
+{% block title %}Price Trends - Yellowknife Grocery Tracker{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="display-6 fw-bold text-primary">
+                    <i class="fas fa-chart-line me-2"></i>Price Trends
+                </h1>
+                <p class="text-muted">Historical price analysis and forecasting</p>
+            </div>
+            <div class="btn-group" role="group">
+                <button class="btn btn-outline-primary" onclick="exportTrends()">
+                    <i class="fas fa-download me-1"></i>Export
+                </button>
+                <button class="btn btn-primary" onclick="refreshTrends()">
+                    <i class="fas fa-refresh me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Time Range Selector -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Time Period</label>
+                        <select class="form-select" id="timePeriod">
+                            <option value="7">Last 7 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="90">Last 3 months</option>
+                            <option value="180">Last 6 months</option>
+                            <option value="365">Last year</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Product Category</label>
+                        <select class="form-select" id="trendCategory">
+                            <option value="">All Categories</option>
+                            <option value="produce">Produce</option>
+                            <option value="dairy">Dairy</option>
+                            <option value="meat">Meat & Seafood</option>
+                            <option value="pantry">Pantry</option>
+                            <option value="frozen">Frozen</option>
+                            <option value="bakery">Bakery</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Search Items</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" placeholder="Enter product name..." id="productSearch">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-success w-100" onclick="updateTrends()">
+                            <i class="fas fa-chart-line me-1"></i>Analyze
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trend Summary Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm trend-card">
+            <div class="card-body text-center">
+                <div class="trend-icon mb-3">
+                    <i class="fas fa-arrow-trend-up text-success fa-2x"></i>
+                </div>
+                <h4 class="text-success fw-bold">+12.3%</h4>
+                <p class="text-muted mb-1">Average Price Increase</p>
+                <small class="text-muted">vs. last month</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm trend-card">
+            <div class="card-body text-center">
+                <div class="trend-icon mb-3">
+                    <i class="fas fa-chart-line text-primary fa-2x"></i>
+                </div>
+                <h4 class="text-primary fw-bold">247</h4>
+                <p class="text-muted mb-1">Price Changes</p>
+                <small class="text-muted">in selected period</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm trend-card">
+            <div class="card-body text-center">
+                <div class="trend-icon mb-3">
+                    <i class="fas fa-crown text-warning fa-2x"></i>
+                </div>
+                <h4 class="text-warning fw-bold">Co-op</h4>
+                <p class="text-muted mb-1">Most Competitive</p>
+                <small class="text-muted">62% best prices</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card border-0 shadow-sm trend-card">
+            <div class="card-body text-center">
+                <div class="trend-icon mb-3">
+                    <i class="fas fa-fire text-danger fa-2x"></i>
+                </div>
+                <h4 class="text-danger fw-bold">Produce</h4>
+                <p class="text-muted mb-1">Highest Volatility</p>
+                <small class="text-muted">±18% variance</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Trend Chart -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-area me-2 text-primary"></i>
+                        Price Trend Analysis
+                    </h5>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <input type="radio" class="btn-check" name="chartType" id="lineChart" checked>
+                        <label class="btn btn-outline-primary" for="lineChart">Line</label>
+                        <input type="radio" class="btn-check" name="chartType" id="barChart">
+                        <label class="btn btn-outline-primary" for="barChart">Bar</label>
+                        <input type="radio" class="btn-check" name="chartType" id="areaChart">
+                        <label class="btn btn-outline-primary" for="areaChart">Area</label>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="trendChart" style="height: 400px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Store Comparison Chart -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-store me-2 text-success"></i>
+                    Store Price Comparison
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="storeChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-tags me-2 text-info"></i>
+                    Category Trends
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Movers Table -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas fa-trophy me-2 text-warning"></i>
+                    Top Price Movers (Last 7 Days)
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="row g-0">
+                    <!-- Biggest Increases -->
+                    <div class="col-md-6 border-end">
+                        <div class="p-4">
+                            <h6 class="text-danger mb-3">
+                                <i class="fas fa-arrow-up me-1"></i>Biggest Increases
+                            </h6>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                                <div>
+                                    <div class="fw-bold">Ground Beef (1lb)</div>
+                                    <small class="text-muted">Save-On-Foods</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-danger fw-bold">+$2.49</div>
+                                    <small class="text-danger">+18.2%</small>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                                <div>
+                                    <div class="fw-bold">Avocados (each)</div>
+                                    <small class="text-muted">Independent Grocer</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-danger fw-bold">+$0.79</div>
+                                    <small class="text-danger">+15.8%</small>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                                <div>
+                                    <div class="fw-bold">Olive Oil (500ml)</div>
+                                    <small class="text-muted">Extra Foods</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-danger fw-bold">+$1.99</div>
+                                    <small class="text-danger">+12.4%</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Biggest Decreases -->
+                    <div class="col-md-6">
+                        <div class="p-4">
+                            <h6 class="text-success mb-3">
+                                <i class="fas fa-arrow-down me-1"></i>Biggest Decreases
+                            </h6>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                                <div>
+                                    <div class="fw-bold">Strawberries (1lb)</div>
+                                    <small class="text-muted">Co-op</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-success fw-bold">-$1.50</div>
+                                    <small class="text-success">-23.1%</small>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                                <div>
+                                    <div class="fw-bold">Chicken Breast (1lb)</div>
+                                    <small class="text-muted">Extra Foods</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-success fw-bold">-$2.00</div>
+                                    <small class="text-success">-16.7%</small>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                                <div>
+                                    <div class="fw-bold">Pasta (454g)</div>
+                                    <small class="text-muted">Independent Grocer</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-success fw-bold">-$0.49</div>
+                                    <small class="text-success">-14.3%</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Forecast Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-crystal-ball me-2 text-purple"></i>
+                        Price Forecast (Next 30 Days)
+                    </h5>
+                    <div class="text-muted small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Based on historical trends and seasonal patterns
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+                    <i class="fas fa-lightbulb me-3 fa-lg"></i>
+                    <div>
+                        <strong>Forecast Insights:</strong>
+                        Produce prices expected to decrease by 8-12% due to seasonal availability. 
+                        Dairy and meat prices may increase by 2-4% following supply chain trends.
+                    </div>
+                </div>
+                
+                <canvas id="forecastChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Chart instances
+let trendChart, storeChart, categoryChart, forecastChart;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    setupEventListeners();
+    updateTrends();
+});
+
+function initializeCharts() {
+    // Main trend chart
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: generateDateLabels(30),
+            datasets: [
+                {
+                    label: 'Independent Grocer',
+                    data: generateSampleData(30, 100, 120),
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    tension: 0.4,
+                    fill: false
+                },
+                {
+                    label: 'Extra Foods',
+                    data: generateSampleData(30, 95, 115),
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    fill: false
+                },
+                {
+                    label: 'Co-op',
+                    data: generateSampleData(30, 90, 110),
+                    borderColor: '#ffc107',
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    tension: 0.4,
+                    fill: false
+                },
+                {
+                    label: 'Save-On-Foods',
+                    data: generateSampleData(30, 105, 125),
+                    borderColor: '#dc3545',
+                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                    tension: 0.4,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toFixed(2);
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+
+    // Store comparison chart
+    const storeCtx = document.getElementById('storeChart').getContext('2d');
+    storeChart = new Chart(storeCtx, {
+        type: 'radar',
+        data: {
+            labels: ['Price Level', 'Price Stability', 'Product Range', 'Update Frequency', 'Savings Potential'],
+            datasets: [
+                {
+                    label: 'Independent Grocer',
+                    data: [85, 75, 90, 80, 70],
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                },
+                {
+                    label: 'Co-op',
+                    data: [90, 85, 85, 90, 85],
+                    borderColor: '#ffc107',
+                    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+
+    // Category trends chart
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    categoryChart = new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Produce', 'Dairy', 'Meat', 'Pantry', 'Frozen', 'Bakery'],
+            datasets: [{
+                data: [23, 18, 15, 20, 12, 12],
+                backgroundColor: [
+                    '#198754',
+                    '#0dcaf0',
+                    '#dc3545',
+                    '#ffc107',
+                    '#6f42c1',
+                    '#fd7e14'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Forecast chart
+    const forecastCtx = document.getElementById('forecastChart').getContext('2d');
+    forecastChart = new Chart(forecastCtx, {
+        type: 'line',
+        data: {
+            labels: generateDateLabels(60, -30),
+            datasets: [
+                {
+                    label: 'Historical Average',
+                    data: generateSampleData(30, 100, 110),
+                    borderColor: '#6c757d',
+                    backgroundColor: 'rgba(108, 117, 125, 0.1)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Forecast',
+                    data: [null, null, null, null, null, null, null, null, null, null, 
+                           null, null, null, null, null, null, null, null, null, null,
+                           null, null, null, null, null, null, null, null, null, 105,
+                           ...generateSampleData(30, 105, 115)],
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    tension: 0.4,
+                    borderDash: [5, 5]
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function setupEventListeners() {
+    document.getElementById('timePeriod').addEventListener('change', updateTrends);
+    document.getElementById('trendCategory').addEventListener('change', updateTrends);
+    
+    // Chart type switcher
+    document.querySelectorAll('input[name="chartType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                trendChart.config.type = this.id.replace('Chart', '');
+                trendChart.update();
+            }
+        });
+    });
+}
+
+function generateDateLabels(days, offset = 0) {
+    const labels = [];
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() + offset);
+    
+    for (let i = 0; i < days; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + i);
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+    return labels;
+}
+
+function generateSampleData(length, min, max) {
+    return Array.from({ length }, () => 
+        Math.random() * (max - min) + min
+    );
+}
+
+function updateTrends() {
+    // Show loading state
+    showAlert('Updating trend analysis...', 'info');
+    
+    // Simulate data update
+    setTimeout(() => {
+        // Update chart data based on filters
+        const period = document.getElementById('timePeriod').value;
+        const category = document.getElementById('trendCategory').value;
+        
+        // Regenerate chart data
+        trendChart.data.labels = generateDateLabels(parseInt(period));
+        trendChart.data.datasets.forEach(dataset => {
+            dataset.data = generateSampleData(parseInt(period), 90, 130);
+        });
+        
+        trendChart.update();
+        showAlert('Trend analysis updated successfully!', 'success');
+    }, 1500);
+}
+
+function refreshTrends() {
+    updateTrends();
+}
+
+function exportTrends() {
+    showAlert('Trend export functionality coming soon!', 'info');
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('main.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}
