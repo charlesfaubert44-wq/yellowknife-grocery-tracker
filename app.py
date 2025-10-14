@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from scrapers.scraper_manager import ScraperManager
-from config import Config
+from config import Config, get_config
 import logging
 
 # Setup logging
@@ -17,13 +17,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config.from_object(Config)
+config = get_config()
+app.config.from_object(config)
 
 # Database setup
-DATABASE = 'grocery_prices.db'
+DATABASE = getattr(config, 'DATABASE_PATH', 'grocery_prices.db')
 
 # Initialize scraper manager
-scraper_manager = ScraperManager(DATABASE, use_demo=True)
+scraper_manager = ScraperManager(DATABASE, use_demo=getattr(config, 'USE_DEMO_DATA', True))
 
 # Initialize scheduler for automatic price updates
 scheduler = BackgroundScheduler()
@@ -113,7 +114,7 @@ def init_db():
         db.commit()
         
         # Add some sample items for testing if using demo mode
-        if Config.USE_DEMO_DATA:
+        if getattr(config, 'USE_DEMO_DATA', True):
             sample_items = [
                 ('Bananas', 1, 'per lb'),  # Produce
                 ('Milk 2%', 2, '4L'),      # Dairy  
@@ -136,7 +137,7 @@ def init_db():
 
 def scheduled_scrape():
     """Scheduled task to scrape all stores"""
-    if not Config.SCRAPING_ENABLED:
+    if not getattr(config, 'SCRAPING_ENABLED', True):
         logger.info("Scraping is disabled in configuration")
         return
     
@@ -411,7 +412,7 @@ def price_comparison():
 @app.route('/api/scrape', methods=['POST'])
 def trigger_scrape():
     """Manually trigger a scrape of all stores"""
-    if not Config.SCRAPING_ENABLED:
+    if not getattr(config, 'SCRAPING_ENABLED', True):
         return jsonify({
             'success': False, 
             'error': 'Scraping is disabled in configuration'
@@ -437,7 +438,7 @@ def trigger_scrape():
 @app.route('/api/scrape/store/<store_name>', methods=['POST'])
 def scrape_store(store_name):
     """Manually trigger a scrape of a specific store"""
-    if not Config.SCRAPING_ENABLED:
+    if not getattr(config, 'SCRAPING_ENABLED', True):
         return jsonify({
             'success': False, 
             'error': 'Scraping is disabled in configuration'
@@ -457,18 +458,19 @@ def scrape_status():
     last_scrape = scraper_manager.get_last_scrape_time()
     
     return jsonify({
-        'enabled': Config.SCRAPING_ENABLED,
-        'interval_hours': Config.SCRAPING_INTERVAL_HOURS,
+        'enabled': getattr(config, 'SCRAPING_ENABLED', True),
+        'interval_hours': getattr(config, 'SCRAPING_INTERVAL_HOURS', 6),
         'last_scrape': last_scrape,
-        'mode': 'demo' if scraper_manager.use_demo else 'production'
+        'mode': 'demo' if scraper_manager.use_demo else 'production',
+        'environment': getattr(config, 'RAILWAY_ENVIRONMENT', 'development')
     })
 
-if __name__ == '__main__':
-    # Initialize database
-    init_db()
-    
-    # Schedule automatic scraping if enabled
-    if Config.SCRAPING_ENABLED:
+# Initialize database and setup when module is imported
+init_db()
+
+# Schedule automatic scraping if enabled
+if getattr(config, 'SCRAPING_ENABLED', True):
+    try:
         # Run initial scrape
         logger.info("Running initial price scrape...")
         scheduled_scrape()
@@ -477,22 +479,32 @@ if __name__ == '__main__':
         scheduler.add_job(
             func=scheduled_scrape,
             trigger='interval',
-            hours=Config.SCRAPING_INTERVAL_HOURS,
+            hours=getattr(config, 'SCRAPING_INTERVAL_HOURS', 6),
             id='scrape_prices',
             replace_existing=True
         )
-        logger.info(f"Scheduled automatic scraping every {Config.SCRAPING_INTERVAL_HOURS} hours")
+        logger.info(f"Scheduled automatic scraping every {getattr(config, 'SCRAPING_INTERVAL_HOURS', 6)} hours")
+    except Exception as e:
+        logger.error(f"Failed to setup scraping: {e}")
+
+if __name__ == '__main__':
+    # This runs when executing directly (not when imported by gunicorn)
+    environment = getattr(config, 'RAILWAY_ENVIRONMENT') or 'development'
     
-    # Run the app
     print("\n" + "="*60)
-    print("🛒 Yellowknife Grocery Price Tracker - ONLINE VERSION")
+    print("🛒 Yellowknife Grocery Price Tracker")
     print("="*60)
-    print(f"\n🌐 Server: http://{Config.HOST}:{Config.PORT}")
-    print(f"🤖 Auto-scraping: {'ENABLED' if Config.SCRAPING_ENABLED else 'DISABLED'}")
-    if Config.SCRAPING_ENABLED:
-        print(f"⏰ Scraping interval: Every {Config.SCRAPING_INTERVAL_HOURS} hours")
+    print(f"\n🌐 Environment: {environment.upper()}")
+    print(f"🌐 Server: http://{getattr(config, 'HOST', '0.0.0.0')}:{getattr(config, 'PORT', 5000)}")
+    print(f"🤖 Auto-scraping: {'ENABLED' if getattr(config, 'SCRAPING_ENABLED', True) else 'DISABLED'}")
+    if getattr(config, 'SCRAPING_ENABLED', True):
+        print(f"⏰ Scraping interval: Every {getattr(config, 'SCRAPING_INTERVAL_HOURS', 6)} hours")
         print(f"🎭 Mode: {'DEMO (sample data)' if scraper_manager.use_demo else 'PRODUCTION'}")
     print("\n💡 Press CTRL+C to quit\n")
     print("="*60 + "\n")
     
-    app.run(debug=(Config.FLASK_ENV == 'development'), host=Config.HOST, port=Config.PORT)
+    app.run(
+        debug=getattr(config, 'DEBUG', False), 
+        host=getattr(config, 'HOST', '0.0.0.0'), 
+        port=getattr(config, 'PORT', 5000)
+    )

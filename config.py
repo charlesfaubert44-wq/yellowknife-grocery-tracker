@@ -15,8 +15,14 @@ class Config:
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5000))
     
+    # Railway-specific settings
+    RAILWAY_ENVIRONMENT = os.environ.get('RAILWAY_ENVIRONMENT')
+    RAILWAY_PROJECT_ID = os.environ.get('RAILWAY_PROJECT_ID')
+    RAILWAY_SERVICE_ID = os.environ.get('RAILWAY_SERVICE_ID')
+    
     # Database settings
     DATABASE_URL = os.environ.get('DATABASE_URL') or 'sqlite:///grocery_prices.db'
+    DATABASE_PATH = os.environ.get('DATABASE_PATH') or 'grocery_prices.db'
     
     # Scraping settings
     SCRAPING_ENABLED = os.environ.get('SCRAPING_ENABLED', 'True').lower() == 'true'
@@ -71,15 +77,40 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
-    USE_DEMO_DATA = False
+    USE_DEMO_DATA = os.environ.get('USE_DEMO_DATA', 'False').lower() == 'true'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or None
     
-    def __init__(self):
-        if not os.environ.get('SECRET_KEY'):
+    # Railway production settings
+    SCRAPING_ENABLED = os.environ.get('SCRAPING_ENABLED', 'True').lower() == 'true'
+    
+    def __post_init__(self):
+        if not self.SECRET_KEY and os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
             raise ValueError("No SECRET_KEY set for production environment")
-        self.SECRET_KEY = os.environ.get('SECRET_KEY')
 
+class RailwayConfig(Config):
+    """Railway deployment configuration"""
+    # Railway automatically provides these
+    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    
+    # Railway-specific settings
+    DEBUG = False
+    TESTING = False
+    
 class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
     USE_DEMO_DATA = True
     DATABASE_URL = 'sqlite:///:memory:'
+
+# Configuration selector
+def get_config():
+    """Get configuration based on environment"""
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        return RailwayConfig()
+    elif os.environ.get('FLASK_ENV') == 'production':
+        return ProductionConfig()
+    elif os.environ.get('FLASK_ENV') == 'testing':
+        return TestingConfig()
+    else:
+        return DevelopmentConfig()
