@@ -111,6 +111,27 @@ def init_db():
                 pass  # Category already exists
         
         db.commit()
+        
+        # Add some sample items for testing if using demo mode
+        if Config.USE_DEMO_DATA:
+            sample_items = [
+                ('Bananas', 1, 'per lb'),  # Produce
+                ('Milk 2%', 2, '4L'),      # Dairy  
+                ('Ground Beef', 3, 'per lb'), # Meat
+                ('White Bread', 4, 'loaf'), # Bakery
+                ('Frozen Pizza', 6, 'each'), # Frozen
+                ('Orange Juice', 7, '1L'),  # Beverages
+            ]
+            
+            for item_name, category_id, unit in sample_items:
+                try:
+                    db.execute('INSERT INTO items (name, category_id, unit) VALUES (?, ?, ?)',
+                             (item_name, category_id, unit))
+                except sqlite3.IntegrityError:
+                    pass  # Item already exists
+            
+            db.commit()
+        
         logger.info("Database initialized successfully")
 
 def scheduled_scrape():
@@ -228,7 +249,7 @@ def items():
     return render_template('items.html', items=items_data, categories=category_stats)
 
 @app.route('/api/stores', methods=['GET', 'POST'])
-def stores():
+def api_stores():
     """Get all stores or add a new one"""
     db = get_db()
     
@@ -245,11 +266,11 @@ def stores():
         except sqlite3.IntegrityError:
             return jsonify({'success': False, 'error': 'Store already exists'}), 400
     
-    stores = db.execute('SELECT * FROM stores ORDER BY name').fetchall()
-    return jsonify([dict(store) for store in stores])
+    stores_data = db.execute('SELECT * FROM stores ORDER BY name').fetchall()
+    return jsonify([dict(store) for store in stores_data])
 
 @app.route('/api/categories', methods=['GET', 'POST'])
-def categories():
+def api_categories():
     """Get all categories or add a new one"""
     db = get_db()
     
@@ -262,11 +283,11 @@ def categories():
         except sqlite3.IntegrityError:
             return jsonify({'success': False, 'error': 'Category already exists'}), 400
     
-    categories = db.execute('SELECT * FROM categories ORDER BY name').fetchall()
-    return jsonify([dict(category) for category in categories])
+    categories_data = db.execute('SELECT * FROM categories ORDER BY name').fetchall()
+    return jsonify([dict(category) for category in categories_data])
 
 @app.route('/api/items', methods=['GET', 'POST'])
-def items():
+def api_items():
     """Get all items or add a new one"""
     db = get_db()
     
@@ -277,16 +298,16 @@ def items():
         db.commit()
         return jsonify({'success': True})
     
-    items = db.execute('''
+    items_data = db.execute('''
         SELECT items.*, categories.name as category_name 
         FROM items 
         LEFT JOIN categories ON items.category_id = categories.id 
         ORDER BY items.name
     ''').fetchall()
-    return jsonify([dict(item) for item in items])
+    return jsonify([dict(item) for item in items_data])
 
 @app.route('/api/prices', methods=['GET', 'POST'])
-def prices():
+def api_prices():
     """Get all prices or add a new price entry"""
     db = get_db()
     
@@ -322,11 +343,11 @@ def prices():
     
     query += ' ORDER BY prices.date DESC, items.name'
     
-    prices = db.execute(query, params).fetchall()
-    return jsonify([dict(price) for price in prices])
+    prices_data = db.execute(query, params).fetchall()
+    return jsonify([dict(price) for price in prices_data])
 
 @app.route('/api/price-trends/<int:item_id>')
-def price_trends(item_id):
+def api_price_trends(item_id):
     """Get price trends for a specific item"""
     db = get_db()
     days = request.args.get('days', 90, type=int)
