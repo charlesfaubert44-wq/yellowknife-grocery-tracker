@@ -82,26 +82,8 @@ def init_db():
             )
         ''')
         
-        # Add some default stores in Yellowknife
-        stores = [
-            ('Independent Grocer', 'Yellowknife, NT', 'https://www.atlanticsuperstore.ca/', 1),
-            ('Extra Foods', 'Yellowknife, NT', 'https://www.extrafoods.ca/', 1),
-            ('The Co-op', 'Yellowknife, NT', 'https://www.coopathome.ca/', 1),
-            ('Save-On-Foods', 'Yellowknife, NT', 'https://www.saveonfoods.com/', 1)
-        ]
-        
-        for store_name, location, url, scraping in stores:
-            try:
-                db.execute(
-                    'INSERT INTO stores (name, location, website_url, scraping_enabled) VALUES (?, ?, ?, ?)', 
-                    (store_name, location, url, scraping)
-                )
-            except sqlite3.IntegrityError:
-                # Update existing stores to enable scraping
-                db.execute(
-                    'UPDATE stores SET scraping_enabled = ?, website_url = ? WHERE name = ?',
-                    (scraping, url, store_name)
-                )
+        # Note: Stores will be dynamically added when they are scraped or manually added
+        # No pre-filled stores to test the system's ability to work with empty data
         
         # Add default categories
         categories = ['Produce', 'Dairy', 'Meat', 'Bakery', 'Pantry', 'Frozen', 'Beverages', 'Snacks']
@@ -466,7 +448,20 @@ def scrape_status():
     })
 
 # Initialize database and setup when module is imported
-init_db()
+try:
+    # Use scraper manager's database initialization
+    scraper_manager.initialize_database()
+    logger.info("Database initialized successfully")
+    
+    # Load test stores for demo mode
+    if scraper_manager.use_demo:
+        stores_added = scraper_manager.add_test_stores()
+        logger.info(f"Added {stores_added} test stores for demo mode")
+    
+except Exception as e:
+    logger.error(f"Database initialization failed: {e}")
+    # Fallback to manual init
+    init_db()
 
 # Schedule automatic scraping if enabled
 if getattr(config, 'SCRAPING_ENABLED', True):

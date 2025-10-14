@@ -27,51 +27,112 @@ class ScraperManager:
         self.use_demo = use_demo
         self.logger = logging.getLogger(__name__)
         
-        # Store configurations
-        self.store_configs = {
-            'independent': {
-                'name': 'Independent Grocer',
-                'base_url': 'https://www.yourindependentgrocer.ca',
-                'selectors': {
-                    'price': '.price',
-                    'name': '.product-name',
-                    'category': '.category'
-                }
-            },
-            'extrafoods': {
-                'name': 'Extra Foods',
-                'base_url': 'https://www.extrafoods.ca',
-                'selectors': {
-                    'price': '.price-current',
-                    'name': '.product-title',
-                    'category': '.breadcrumb'
-                }
-            },
-            'coop': {
-                'name': 'The Co-op',
-                'base_url': 'https://www.co-op.coop',
-                'selectors': {
-                    'price': '.price-amount',
-                    'name': '.product-name',
-                    'category': '.category-link'
-                }
-            },
-            'saveon': {
-                'name': 'Save-On-Foods',
-                'base_url': 'https://www.saveonfoods.com',
-                'selectors': {
-                    'price': '.price-value',
-                    'name': '.product-title',
-                    'category': '.nav-category'
-                }
-            }
-        }
+        # Store configurations - empty initially, can be added dynamically
+        self.store_configs = {}
     
     def get_db_connection(self):
         """Get database connection"""
         conn = sqlite3.connect(self.database_path)
         conn.row_factory = sqlite3.Row
         return conn
+    
+    def initialize_database(self):
+        """Initialize database tables if they don't exist"""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # Create tables if they don't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS stores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    location TEXT,
+                    website_url TEXT,
+                    scraping_enabled BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    category_id INTEGER,
+                    unit TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (category_id) REFERENCES categories (id)
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS prices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_id INTEGER NOT NULL,
+                    store_id INTEGER NOT NULL,
+                    price REAL NOT NULL,
+                    date DATE NOT NULL,
+                    notes TEXT,
+                    source TEXT DEFAULT 'scraper',
+                    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (item_id) REFERENCES items (id),
+                    FOREIGN KEY (store_id) REFERENCES stores (id)
+                )
+            ''')
+            
+            conn.commit()
+            self.logger.info("Database tables initialized successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing database: {str(e)}")
+            raise
+        finally:
+            conn.close()
+    
+    def add_store_config(self, store_id: str, name: str, base_url: str = None, location: str = None):
+        """
+        Add a new store configuration
+        
+        Args:
+            store_id: Unique identifier for the store
+            name: Display name of the store
+            base_url: Base URL for scraping (optional)
+            location: Store location (optional)
+        """
+        self.store_configs[store_id] = {
+            'name': name,
+            'base_url': base_url or '',
+            'location': location or '',
+            'selectors': {
+                'price': '.price',
+                'name': '.product-name', 
+                'category': '.category'
+            }
+        }
+        
+        # Add to database
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR IGNORE INTO stores (name, location, website_url, scraping_enabled) 
+                VALUES (?, ?, ?, 1)
+            ''', (name, location or '', base_url or ''))
+            conn.commit()
+            self.logger.info(f"Added store configuration: {name}")
+        except Exception as e:
+            self.logger.error(f"Error adding store to database: {str(e)}")
+        finally:
+            conn.close()
     
     def scrape_store_prices(self, store_id: str) -> List[Dict]:
         """
@@ -193,6 +254,10 @@ class ScraperManager:
         """
         results = {}
         
+        if not self.store_configs:
+            self.logger.warning("No stores configured for scraping")
+            return results
+        
         for store_id in self.store_configs.keys():
             try:
                 scraped_data = self.scrape_store_prices(store_id)
@@ -228,13 +293,26 @@ class ScraperManager:
             cursor = conn.cursor()
             saved_count = 0
             
-            for item in scraped_data:
-                # First, get or create the store
-                cursor.execute('SELECT id FROM stores WHERE name = ?', (self.store_configs[store_id]['name'],))
-                store_result = cursor.fetchone()
-                if not store_result:
-                    continue  # Skip if store doesn't exist
+            # Ensure store exists in database
+            store_name = self.store_configs[store_id]['name']
+            cursor.execute('SELECT id FROM stores WHERE name = ?', (store_name,))
+            store_result = cursor.fetchone()
+            if not store_result:
+                # Store doesn't exist, create it
+                cursor.execute('''
+                    INSERT INTO stores (name, location, website_url, scraping_enabled) 
+                    VALUES (?, ?, ?, 1)
+                ''', (
+                    store_name,
+                    self.store_configs[store_id].get('location', ''),
+                    self.store_configs[store_id].get('base_url', '')
+                ))
+                store_db_id = cursor.lastrowid
+                self.logger.info(f"Created new store in database: {store_name}")
+            else:
                 store_db_id = store_result[0]
+            
+            for item in scraped_data:
                 
                 # Get or create the category
                 cursor.execute('SELECT id FROM categories WHERE name = ?', (item['category'],))
@@ -450,3 +528,95 @@ class ScraperManager:
             return None
         finally:
             conn.close()
+    
+    def add_test_stores(self):
+        """Add test stores for demonstration and testing"""
+        test_stores = [
+            {
+                'id': 'test_independent',
+                'name': 'Test Independent Grocer',
+                'location': 'Yellowknife, NT',
+                'url': 'https://example.com/independent'
+            },
+            {
+                'id': 'test_extrafoods', 
+                'name': 'Test Extra Foods',
+                'location': 'Yellowknife, NT',
+                'url': 'https://example.com/extrafoods'
+            },
+            {
+                'id': 'test_coop',
+                'name': 'Test Co-op',
+                'location': 'Yellowknife, NT', 
+                'url': 'https://example.com/coop'
+            }
+        ]
+        
+        for store in test_stores:
+            self.add_store_config(
+                store['id'], 
+                store['name'], 
+                store['url'], 
+                store['location']
+            )
+        
+        self.logger.info(f"Added {len(test_stores)} test stores")
+        return len(test_stores)
+    
+    def get_all_stores(self):
+        """Get all stores from database"""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM stores ORDER BY name')
+            stores = cursor.fetchall()
+            return [dict(store) for store in stores]
+        except Exception as e:
+            self.logger.error(f"Error fetching stores: {str(e)}")
+            return []
+        finally:
+            conn.close()
+    
+    def test_system(self):
+        """Test the complete scraping system"""
+        test_results = {
+            'database_init': False,
+            'stores_added': 0,
+            'scraping_test': {},
+            'data_saved': 0,
+            'errors': []
+        }
+        
+        try:
+            # Test 1: Initialize database
+            self.initialize_database()
+            test_results['database_init'] = True
+            self.logger.info("✅ Database initialization successful")
+            
+            # Test 2: Add test stores
+            test_results['stores_added'] = self.add_test_stores()
+            self.logger.info(f"✅ Added {test_results['stores_added']} test stores")
+            
+            # Test 3: Test scraping
+            scraping_results = self.scrape_all_stores(save_to_db=True)
+            test_results['scraping_test'] = scraping_results
+            
+            # Calculate total data saved
+            total_saved = sum(r.get('saved_count', 0) for r in scraping_results.values())
+            test_results['data_saved'] = total_saved
+            
+            self.logger.info(f"✅ Scraping test complete. Saved {total_saved} price records")
+            
+            # Test 4: Verify data in database
+            stores = self.get_all_stores()
+            if stores:
+                self.logger.info(f"✅ Database contains {len(stores)} stores")
+            else:
+                test_results['errors'].append("No stores found in database")
+                
+        except Exception as e:
+            error_msg = f"System test failed: {str(e)}"
+            test_results['errors'].append(error_msg)
+            self.logger.error(error_msg)
+        
+        return test_results
