@@ -16,7 +16,7 @@ class Config:
     PORT = int(os.environ.get('PORT', 5000))
 
     # Security settings
-    SESSION_COOKIE_SECURE = True  # Only send cookies over HTTPS
+    SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
     SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
     SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
@@ -98,10 +98,13 @@ class RailwayConfig(Config):
     # Railway automatically provides these
     SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
     DATABASE_URL = os.environ.get('DATABASE_URL')
-    
+
     # Railway-specific settings
     DEBUG = False
     TESTING = False
+
+    # Railway provides HTTPS, enable secure cookies
+    SESSION_COOKIE_SECURE = True
     
 class TestingConfig(Config):
     """Testing configuration"""
