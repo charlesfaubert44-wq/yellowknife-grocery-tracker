@@ -7,13 +7,19 @@ from datetime import timedelta
 
 class Config:
     """Base configuration class"""
-    
+
     # Flask settings
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
     HOST = os.environ.get('HOST', '0.0.0.0')
     PORT = int(os.environ.get('PORT', 5000))
+
+    # Security settings
+    SESSION_COOKIE_SECURE = True  # Only send cookies over HTTPS
+    SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
+    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
     
     # Railway-specific settings
     RAILWAY_ENVIRONMENT = os.environ.get('RAILWAY_ENVIRONMENT')

@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask_cors import CORS
 from datetime import datetime, timedelta
 import sqlite3
 import json
@@ -8,6 +9,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from scrapers.scraper_manager import ScraperManager
 from config import Config, get_config
 import logging
+from contextlib import contextmanager
+from functools import wraps
+import re
 
 # Setup logging
 logging.basicConfig(
@@ -20,6 +24,9 @@ app = Flask(__name__)
 config = get_config()
 app.config.from_object(config)
 
+# Enable CORS for API endpoints
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 # Database setup
 DATABASE = getattr(config, 'DATABASE_PATH', 'grocery_prices.db')
 
@@ -30,16 +37,68 @@ scraper_manager = ScraperManager(DATABASE, use_demo=getattr(config, 'USE_DEMO_DA
 scheduler = BackgroundScheduler()
 scheduler.start()
 
+@contextmanager
 def get_db():
-    """Get database connection"""
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Get database connection with automatic cleanup"""
+    conn = None
+    try:
+        conn = sqlite3.connect(DATABASE, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        # Enable foreign key constraints
+        conn.execute('PRAGMA foreign_keys = ON')
+        yield conn
+    except sqlite3.Error as e:
+        logger.error(f"Database error: {str(e)}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+def validate_input(data, required_fields, field_types=None):
+    """Validate input data against required fields and types"""
+    if not data:
+        return False, "No data provided"
+
+    # Check required fields
+    for field in required_fields:
+        if field not in data or data[field] is None or str(data[field]).strip() == '':
+            return False, f"Missing required field: {field}"
+
+    # Check field types if provided
+    if field_types:
+        for field, expected_type in field_types.items():
+            if field in data and data[field] is not None:
+                if expected_type == 'string' and not isinstance(data[field], str):
+                    return False, f"Field {field} must be a string"
+                elif expected_type == 'number':
+                    try:
+                        float(data[field])
+                    except (ValueError, TypeError):
+                        return False, f"Field {field} must be a number"
+                elif expected_type == 'boolean' and not isinstance(data[field], bool):
+                    return False, f"Field {field} must be a boolean"
+
+    return True, None
+
+def sanitize_string(value, max_length=255):
+    """Sanitize string input to prevent XSS and injection attacks"""
+    if not isinstance(value, str):
+        value = str(value)
+
+    # Remove potentially harmful characters
+    value = re.sub(r'[<>"\']', '', value)
+
+    # Limit length
+    value = value[:max_length].strip()
+
+    return value
 
 def init_db():
     """Initialize the database with tables"""
     with app.app_context():
-        db = get_db()
+        with get_db() as db:
         db.execute('''
             CREATE TABLE IF NOT EXISTS stores (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,29 +193,32 @@ def scheduled_scrape():
 @app.route('/')
 def index():
     """Main dashboard with real data"""
-    db = get_db()
-    
-    # Get summary statistics
-    stats = {
-        'total_items': db.execute('SELECT COUNT(*) as count FROM items').fetchone()['count'],
-        'active_stores': db.execute('SELECT COUNT(*) as count FROM stores WHERE scraping_enabled = 1').fetchone()['count'],
-        'total_prices': db.execute('SELECT COUNT(*) as count FROM prices WHERE date = DATE("now")').fetchone()['count'],
-        'last_update': db.execute('SELECT MAX(created_at) as last_update FROM prices').fetchone()['last_update']
-    }
-    
-    # Get recent price comparisons
-    recent_prices = db.execute('''
-        SELECT i.name, i.id, c.name as category,
-               GROUP_CONCAT(s.name || ':' || p.price) as store_prices
-        FROM items i
-        LEFT JOIN categories c ON i.category_id = c.id
-        LEFT JOIN prices p ON i.id = p.item_id AND p.date = DATE("now")
-        LEFT JOIN stores s ON p.store_id = s.id
-        GROUP BY i.id, i.name, c.name
-        LIMIT 10
-    ''').fetchall()
-    
-    return render_template('index.html', stats=stats, recent_prices=recent_prices)
+    try:
+        with get_db() as db:
+            # Get summary statistics
+            stats = {
+                'total_items': db.execute('SELECT COUNT(*) as count FROM items').fetchone()['count'],
+                'active_stores': db.execute('SELECT COUNT(*) as count FROM stores WHERE scraping_enabled = 1').fetchone()['count'],
+                'total_prices': db.execute('SELECT COUNT(*) as count FROM prices WHERE date = DATE("now")').fetchone()['count'],
+                'last_update': db.execute('SELECT MAX(created_at) as last_update FROM prices').fetchone()['last_update']
+            }
+
+            # Get recent price comparisons
+            recent_prices = db.execute('''
+                SELECT i.name, i.id, c.name as category,
+                       GROUP_CONCAT(s.name || ':' || p.price) as store_prices
+                FROM items i
+                LEFT JOIN categories c ON i.category_id = c.id
+                LEFT JOIN prices p ON i.id = p.item_id AND p.date = DATE("now")
+                LEFT JOIN stores s ON p.store_id = s.id
+                GROUP BY i.id, i.name, c.name
+                LIMIT 10
+            ''').fetchall()
+
+            return render_template('index.html', stats=stats, recent_prices=recent_prices)
+    except Exception as e:
+        logger.error(f"Error loading dashboard: {str(e)}")
+        return render_template('error.html', error="Failed to load dashboard data"), 500
 
 @app.route('/price-trends')
 def price_trends():
@@ -234,23 +296,42 @@ def items():
 @app.route('/api/stores', methods=['GET', 'POST'])
 def api_stores():
     """Get all stores or add a new one"""
-    db = get_db()
-    
-    if request.method == 'POST':
-        data = request.json
-        try:
-            db.execute(
-                'INSERT INTO stores (name, location, website_url, scraping_enabled) VALUES (?, ?, ?, ?)', 
-                (data['name'], data.get('location', ''), data.get('website_url', ''), 
-                 data.get('scraping_enabled', 0))
-            )
-            db.commit()
-            return jsonify({'success': True})
-        except sqlite3.IntegrityError:
-            return jsonify({'success': False, 'error': 'Store already exists'}), 400
-    
-    stores_data = db.execute('SELECT * FROM stores ORDER BY name').fetchall()
-    return jsonify([dict(store) for store in stores_data])
+    try:
+        with get_db() as db:
+            if request.method == 'POST':
+                data = request.json
+
+                # Validate input
+                is_valid, error_msg = validate_input(
+                    data,
+                    required_fields=['name'],
+                    field_types={'name': 'string', 'location': 'string', 'website_url': 'string'}
+                )
+                if not is_valid:
+                    return jsonify({'success': False, 'error': error_msg}), 400
+
+                # Sanitize inputs
+                name = sanitize_string(data['name'], max_length=100)
+                location = sanitize_string(data.get('location', ''), max_length=200)
+                website_url = sanitize_string(data.get('website_url', ''), max_length=500)
+                scraping_enabled = int(data.get('scraping_enabled', 0))
+
+                try:
+                    db.execute(
+                        'INSERT INTO stores (name, location, website_url, scraping_enabled) VALUES (?, ?, ?, ?)',
+                        (name, location, website_url, scraping_enabled)
+                    )
+                    db.commit()
+                    return jsonify({'success': True, 'message': 'Store added successfully'})
+                except sqlite3.IntegrityError:
+                    return jsonify({'success': False, 'error': 'Store already exists'}), 400
+
+            # GET request
+            stores_data = db.execute('SELECT * FROM stores ORDER BY name').fetchall()
+            return jsonify([dict(store) for store in stores_data])
+    except Exception as e:
+        logger.error(f"Error in api_stores: {str(e)}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 @app.route('/api/categories', methods=['GET', 'POST'])
 def api_categories():
@@ -272,38 +353,91 @@ def api_categories():
 @app.route('/api/items', methods=['GET', 'POST'])
 def api_items():
     """Get all items or add a new one"""
-    db = get_db()
-    
-    if request.method == 'POST':
-        data = request.json
-        db.execute('INSERT INTO items (name, category_id, unit) VALUES (?, ?, ?)',
-                  (data['name'], data['category_id'], data.get('unit', 'each')))
-        db.commit()
-        return jsonify({'success': True})
-    
-    items_data = db.execute('''
-        SELECT items.*, categories.name as category_name 
-        FROM items 
-        LEFT JOIN categories ON items.category_id = categories.id 
-        ORDER BY items.name
-    ''').fetchall()
-    return jsonify([dict(item) for item in items_data])
+    try:
+        with get_db() as db:
+            if request.method == 'POST':
+                data = request.json
+
+                # Validate input
+                is_valid, error_msg = validate_input(
+                    data,
+                    required_fields=['name', 'category_id'],
+                    field_types={'name': 'string', 'category_id': 'number', 'unit': 'string'}
+                )
+                if not is_valid:
+                    return jsonify({'success': False, 'error': error_msg}), 400
+
+                # Sanitize inputs
+                name = sanitize_string(data['name'], max_length=100)
+                category_id = int(data['category_id'])
+                unit = sanitize_string(data.get('unit', 'each'), max_length=50)
+
+                # Verify category exists
+                category = db.execute('SELECT id FROM categories WHERE id = ?', (category_id,)).fetchone()
+                if not category:
+                    return jsonify({'success': False, 'error': 'Invalid category_id'}), 400
+
+                db.execute('INSERT INTO items (name, category_id, unit) VALUES (?, ?, ?)',
+                          (name, category_id, unit))
+                db.commit()
+                return jsonify({'success': True, 'message': 'Item added successfully'})
+
+            # GET request
+            items_data = db.execute('''
+                SELECT items.*, categories.name as category_name
+                FROM items
+                LEFT JOIN categories ON items.category_id = categories.id
+                ORDER BY items.name
+            ''').fetchall()
+            return jsonify([dict(item) for item in items_data])
+    except Exception as e:
+        logger.error(f"Error in api_items: {str(e)}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 @app.route('/api/prices', methods=['GET', 'POST'])
 def api_prices():
     """Get all prices or add a new price entry"""
-    db = get_db()
-    
-    if request.method == 'POST':
-        data = request.json
-        db.execute('''
-            INSERT INTO prices (item_id, store_id, price, date, notes, source) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (data['item_id'], data['store_id'], data['price'], 
-              data.get('date', datetime.now().strftime('%Y-%m-%d')), 
-              data.get('notes', ''), data.get('source', 'manual')))
-        db.commit()
-        return jsonify({'success': True})
+    try:
+        with get_db() as db:
+            if request.method == 'POST':
+                data = request.json
+
+                # Validate input
+                is_valid, error_msg = validate_input(
+                    data,
+                    required_fields=['item_id', 'store_id', 'price'],
+                    field_types={'item_id': 'number', 'store_id': 'number', 'price': 'number'}
+                )
+                if not is_valid:
+                    return jsonify({'success': False, 'error': error_msg}), 400
+
+                # Sanitize and validate inputs
+                item_id = int(data['item_id'])
+                store_id = int(data['store_id'])
+                price = float(data['price'])
+
+                if price < 0:
+                    return jsonify({'success': False, 'error': 'Price cannot be negative'}), 400
+
+                date_str = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+                notes = sanitize_string(data.get('notes', ''), max_length=500)
+                source = sanitize_string(data.get('source', 'manual'), max_length=50)
+
+                # Verify item and store exist
+                item = db.execute('SELECT id FROM items WHERE id = ?', (item_id,)).fetchone()
+                store = db.execute('SELECT id FROM stores WHERE id = ?', (store_id,)).fetchone()
+
+                if not item:
+                    return jsonify({'success': False, 'error': 'Invalid item_id'}), 400
+                if not store:
+                    return jsonify({'success': False, 'error': 'Invalid store_id'}), 400
+
+                db.execute('''
+                    INSERT INTO prices (item_id, store_id, price, date, notes, source)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (item_id, store_id, price, date_str, notes, source))
+                db.commit()
+                return jsonify({'success': True, 'message': 'Price added successfully'})
     
     # Get query parameters for filtering
     days = request.args.get('days', 30, type=int)
